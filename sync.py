@@ -3,10 +3,69 @@ app = Flask(__name__)
 import urllib
 import urlparse
 import json, requests
-
+import pandas as pd
+from xml.etree import ElementTree as ET
 
 HEAD = "<html><head><title>Sync Galaxy Test</title></head><body>"
 TAIL = "</body></html>"
+
+class AE_sample :
+
+    def __init__(self, newName):
+        self.name = newName
+        self.paired = False
+        self.extension = ''
+        self.metadata = {}
+        self.forward_ftp = None
+        self.reverse_ftp = None
+
+    def add_forward_ftp (self, uri):
+        self.forward_ftp = uri
+
+    def add_reverse_ftp (self, uri):
+        self.reverse_ftp = uri
+        self.paired =  True
+
+    def set_extension (self, ext):
+        self.extension  =  ext
+
+    def add_metadata (self, key, value):
+        self.metadata[key] = value
+
+    def __str__(self):
+        mode = 'SE'
+        if self.paired:
+            mode = 'PE'
+        files = []
+        if self.forward_ftp:
+            files.append(self.forward_ftp)
+        if self.reverse_ftp:
+            files.append(self.reverse_ftp)
+
+        return "{name} ({mode})\n\t{file}\n".format(name = self.name, mode = mode, file = '\n\t'.join(files))
+
+    def galaxy_json_item (self, uri):
+        item = {}
+        item['url'] = uri
+        item['name'] = self.name
+        item['extension'] = self.extension
+        item['metadata'] = self.metadata
+
+        item['extra_data'] = [
+            {
+                "url" : uri,
+                "path" : uri
+            }
+        ]
+        return item
+
+    def galaxy_json_items (self):
+        items = []
+        if self.forward_ftp:
+            items.append(self.galaxy_json_item(self.forward_ftp))
+        if self.reverse_ftp:
+            items.append(self.galaxy_json_item(self.reverse_ftp))
+        return items
 
 @app.route("/")
 def hello():
@@ -44,12 +103,66 @@ def get_request_params():
 @app.route("/get_data_for_galaxy/")
 def get_data():
     # Assume that a list of BioSample Accessions is needed
-    resource_id = "MTAB-3758"
+    resource_id = "E-MTAB-3758"
     BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
     all_sample_accessions = _get_samples(BIOSAMPLES_URL)
 
+    biosamples_response = []
 
-    biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+    for acc in all_sample_accessions:        
+        sample = AE_sample(acc)
+
+        files = []
+
+        ena_sample_file = "http://www.ebi.ac.uk/ena/data/view/{acc}&display=xml".format(acc=acc)
+        ena_sample_content = requests.get(ena_sample_file).content
+        ena_sample_root_element = ET.fromstring(ena_sample_content)
+        ena_run = None
+        for child in ena_sample_root_element.iter():
+            if child.tag == 'SAMPLE_LINKS':
+                for s in child.iter():
+                    if 'ERR' in s.text:
+                        #print(s.text)
+                        ena_run = s.text
+            elif child.tag == 'SAMPLE_ATTRIBUTE':
+                for s in child.iter():
+                    if s.tag == 'SAMPLE_ATTRIBUTE':
+                        pass
+                    elif s.tag == 'TAG':
+                        new_tag = s.text
+                    elif s.tag == 'VALUE':
+                        new_value = s.text
+                        if not 'ENA-' in new_tag:
+                            sample.add_metadata(new_tag, new_value)
+                            #print("%s : %s" % (new_tag, new_value))
+
+                    else:
+                        print("UNEXPECTED TAG : %s" % s.tag)
+        if ena_run:
+            ena_run_file = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={ena_run}&result=read_run&fields=fastq_ftp".format(ena_run=ena_run)
+            ena_run_content = requests.get(ena_run_file).content
+            for line in ena_run_content.decode('utf-8').split():
+                if 'ftp.sra.ebi.ac.uk/vol1/fastq/' in line:
+                    for uri in line.split(';'):
+                        #print(uri)
+                        files.append("ftp://{uri}".format(uri=uri))
+        else:
+            print("No RUN found")
+
+        for fastq_uri in files:
+            if '_1.fastq' in fastq_uri:
+                sample.add_forward_ftp(fastq_uri)
+            elif '_2.fastq' in fastq_uri:
+                sample.add_reverse_ftp(fastq_uri)
+            if not sample.extension:
+                sample.set_extension(fastq_uri.split('/')[-1].split('.',1)[1])
+            else :
+                if sample.extension != fastq_uri.split('/')[-1].split('.',1)[1]:
+                    print("Forward and reverse different extension ?")
+
+        biosamples_response.extend(sample.galaxy_json_items())
+
+    #biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
     #NOTE: Use Python Libraries to parameterize URL
     return json_biosamples_response
@@ -99,7 +212,7 @@ def fetch():
 
     # {'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     print type(biosamples_response)
-    
+
     json_biosamples_response = json.dumps(biosamples_response)
     # return json_biosamples_response
     url_for_galaxy = "http://localhost:4000/get_data_for_galaxy"
@@ -125,7 +238,7 @@ def export():
     # entire content that you wish to go into a dataset (no
     # partials/paginated/javascript/etc)
     # fetch_url = 'http://localhost:4000/fetch/?var=1&b=23' # ORIGINAL
-    
+
     # fetch_url = 'http://localhost:4000/fetch/?ae_link=http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-4104/'
     # fetch_url = 'http://www.ebi.ac.uk/biosamples/api/samplesrelations/SAMEA4084308/externalLinks' # TEST
     # fetch_url = 'https://www.ebi.ac.uk/biosamples/api/samples/SAMEA4084308'
