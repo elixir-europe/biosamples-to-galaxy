@@ -234,7 +234,7 @@ def get_data():
         if sample_count < 5:
             print acc
             # create new sample
-            biosample_details = "http://www.ebi.ac.uk/biosamples/api/samples/{acc}".format(acc=biosample)
+            biosample_details = "http://www.ebi.ac.uk/biosamples/api/samples/{acc}".format(acc=acc)
             biosample_details_content = requests.get(biosample_details).content
             biosample_details_json = json.loads(biosample_details_content.decode('utf-8'))
 
