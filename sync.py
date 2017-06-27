@@ -1,10 +1,12 @@
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, render_template
 app = Flask(__name__)
 import urllib
 import urlparse
 import json, requests
 import pandas as pd
 from xml.etree import ElementTree as ET
+
+import logging
 
 HEAD = "<html><head><title>Sync Galaxy Test</title></head><body>"
 TAIL = "</body></html>"
@@ -67,7 +69,8 @@ class AE_sample :
             items.append(self.galaxy_json_item(self.reverse_ftp))
         return items
 
-@app.route("/")
+
+@app.route("/", methods=['GET', 'POST'])
 def hello():
     """Index page
 
@@ -90,9 +93,17 @@ def hello():
 
     # export_url is where the "fun" will happen.
     return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
+    
+    # use template 
+    # if request.method == 'GET':
+    #     return render_template('index.html')
+    # else:
+    #     app.logger.info("Data posted")
+    #     return render_template('index.html'), get_data()
 
 
 def get_request_params():
+    app.logger.info("get_request_params() called")
     """Simply function to display request arguments as a table."""
     result = '<table border=1><thead><tr><th>Key</th><th>Value</th></tr><tbody>'
     for key in request.args:
@@ -109,61 +120,69 @@ def get_data():
 
     biosamples_response = []
 
-    for acc in all_sample_accessions:        
-        sample = AE_sample(acc)
+    sample_count = 0
+    for acc in all_sample_accessions:
+        sample_count += 1
 
-        files = []
+        if sample_count < 5:
+            print acc      
+            sample = AE_sample(acc)
 
-        ena_sample_file = "http://www.ebi.ac.uk/ena/data/view/{acc}&display=xml".format(acc=acc)
-        ena_sample_content = requests.get(ena_sample_file).content
-        ena_sample_root_element = ET.fromstring(ena_sample_content)
-        ena_run = None
-        for child in ena_sample_root_element.iter():
-            if child.tag == 'SAMPLE_LINKS':
-                for s in child.iter():
-                    if 'ERR' in s.text:
-                        #print(s.text)
-                        ena_run = s.text
-            elif child.tag == 'SAMPLE_ATTRIBUTE':
-                for s in child.iter():
-                    if s.tag == 'SAMPLE_ATTRIBUTE':
-                        pass
-                    elif s.tag == 'TAG':
-                        new_tag = s.text
-                    elif s.tag == 'VALUE':
-                        new_value = s.text
-                        if not 'ENA-' in new_tag:
-                            sample.add_metadata(new_tag, new_value)
-                            #print("%s : %s" % (new_tag, new_value))
+            files = []
 
-                    else:
-                        print("UNEXPECTED TAG : %s" % s.tag)
-        if ena_run:
-            ena_run_file = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={ena_run}&result=read_run&fields=fastq_ftp".format(ena_run=ena_run)
-            ena_run_content = requests.get(ena_run_file).content
-            for line in ena_run_content.decode('utf-8').split():
-                if 'ftp.sra.ebi.ac.uk/vol1/fastq/' in line:
-                    for uri in line.split(';'):
-                        #print(uri)
-                        files.append("ftp://{uri}".format(uri=uri))
-        else:
-            print("No RUN found")
+            ena_sample_file = "http://www.ebi.ac.uk/ena/data/view/{acc}&display=xml".format(acc=acc)
+            ena_sample_content = requests.get(ena_sample_file).content
+            print "ENA Sample Content: ", ena_sample_content
+            ena_sample_root_element = ET.fromstring(ena_sample_content)
+            ena_run = None
+            for child in ena_sample_root_element.iter():
+                if child.tag == 'SAMPLE_LINKS':
+                    for s in child.iter():
+                        if 'ERR' in s.text:
+                            #print(s.text)
+                            ena_run = s.text
+                elif child.tag == 'SAMPLE_ATTRIBUTE':
+                    for s in child.iter():
+                        if s.tag == 'SAMPLE_ATTRIBUTE':
+                            pass
+                        elif s.tag == 'TAG':
+                            new_tag = s.text
+                        elif s.tag == 'VALUE':
+                            new_value = s.text
+                            if not 'ENA-' in new_tag:
+                                sample.add_metadata(new_tag, new_value)
+                                #print("%s : %s" % (new_tag, new_value))
 
-        for fastq_uri in files:
-            if '_1.fastq' in fastq_uri:
-                sample.add_forward_ftp(fastq_uri)
-            elif '_2.fastq' in fastq_uri:
-                sample.add_reverse_ftp(fastq_uri)
-            if not sample.extension:
-                sample.set_extension(fastq_uri.split('/')[-1].split('.',1)[1])
-            else :
-                if sample.extension != fastq_uri.split('/')[-1].split('.',1)[1]:
-                    print("Forward and reverse different extension ?")
+                        else:
+                            print("UNEXPECTED TAG : %s" % s.tag)
+            if ena_run:
+                ena_run_file = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={ena_run}&result=read_run&fields=fastq_ftp".format(ena_run=ena_run)
+                ena_run_content = requests.get(ena_run_file).content
+                for line in ena_run_content.decode('utf-8').split():
+                    if 'ftp.sra.ebi.ac.uk/vol1/fastq/' in line:
+                        for uri in line.split(';'):
+                            #print(uri)
+                            files.append("ftp://{uri}".format(uri=uri))
+            else:
+                print("No RUN found")
 
-        biosamples_response.extend(sample.galaxy_json_items())
+            for fastq_uri in files:
+                if '_1.fastq' in fastq_uri:
+                    sample.add_forward_ftp(fastq_uri)
+                elif '_2.fastq' in fastq_uri:
+                    sample.add_reverse_ftp(fastq_uri)
+                if not sample.extension:
+                    sample.set_extension(fastq_uri.split('/')[-1].split('.',1)[1])
+                else :
+                    if sample.extension != fastq_uri.split('/')[-1].split('.',1)[1]:
+                        print("Forward and reverse different extension ?")
 
-    #biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+            biosamples_response.extend(sample.galaxy_json_items())
+
+    # test file
+    # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
+    print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
     return json_biosamples_response
 
