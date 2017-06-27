@@ -5,6 +5,7 @@ import urlparse
 import json, requests
 import pandas as pd
 from xml.etree import ElementTree as ET
+import io
 
 import logging
 
