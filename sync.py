@@ -283,7 +283,7 @@ def get_data():
             biosamples_response.extend(sample.galaxy_json_items())
 
     # test file
-    biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+    # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
     print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
