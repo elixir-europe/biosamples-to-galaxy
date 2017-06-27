@@ -93,7 +93,7 @@ class AE_sample :
             print "AE  ", ae
         return items
 
-def _get_fastq_from_ENA_RUN (ena_link):
+def _get_fastq_from_ENA_RUN (ena_link, sample):
     files = []
     ena_sample_file = "{ena_link}&display=xml".format(ena_link=ena_link)
     ena_sample_content = requests.get(ena_sample_file).content
@@ -252,7 +252,7 @@ def get_data():
 
             # if no link is found, skip
             if ena_link:
-                sample = _get_fastq_from_ENA_RUN(ena_link)
+                sample = _get_fastq_from_ENA_RUN(ena_link, sample)
                 print(sample)
                 AE_samples[sample.name] = sample
             else :
