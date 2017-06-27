@@ -93,8 +93,8 @@ def hello():
 
     # export_url is where the "fun" will happen.
     return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
-    
-    # use template 
+
+    # use template
     # if request.method == 'GET':
     #     return render_template('index.html')
     # else:
@@ -125,12 +125,25 @@ def get_data():
         sample_count += 1
 
         if sample_count < 5:
-            print acc      
+            print acc
             sample = AE_sample(acc)
+            biosample_externalLinks = "http://www.ebi.ac.uk/biosamples/api/samplesrelations/{acc}/externalLinks".format(acc=acc)
+            biosample_externalLinks_content = requests.get(biosample_externalLinks).content
+
+            biosample_externalLinks_json = json.loads(biosample_externalLinks_content.decode('utf-8'))
+            ena_link = None
+            for link in biosample_externalLinks_json['_embedded']['externallinksrelations']:
+                if 'ERS' in link['url']:
+                    ena_link = link['url']
+                    break
+
+            if not ena_link:
+                print("No ENA link found")
+                continue
 
             files = []
 
-            ena_sample_file = "http://www.ebi.ac.uk/ena/data/view/{acc}&display=xml".format(acc=acc)
+            ena_sample_file = "{ena_link}&display=xml".format(ena_link=ena_link)
             ena_sample_content = requests.get(ena_sample_file).content
             print "ENA Sample Content: ", ena_sample_content
             ena_sample_root_element = ET.fromstring(ena_sample_content)
