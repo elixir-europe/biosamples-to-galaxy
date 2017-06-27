@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<tool name="JSON data source" id="json_data_source" tool_type="data_source" hidden="False" display_interface="False" version="1.0.0" force_history_refresh="True">
+    <description> - parse and download data and metadata from a JSON response</description>
+    <version_command>python json_data_source.py --version</version_command>
+    <command interpreter="python">json_data_source.py $__app__.config.output_size_limit --json_param_file "${output1}" --path "."</command>
+    <inputs action="http://localhost:4000/" check_values="False">
+        <display>go to Sync Datasource $GALAXY_URL</display>
+        <param name="URL" type="hidden" value="" />
+    </inputs>
+    <outputs>
+        <data format="auto" name="output1" />
+    </outputs>
+    <options sanitize="False" refresh="True"/>
+</tool>
