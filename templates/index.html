@@ -1,0 +1,25 @@
+{% extends "main.html" %}
+{% block content %}
+ <div class="container">
+    <br><br>
+    <h1>BioSamples</h1>
+    
+    <div class="row center">
+      <h5>Select data to export to Galaxy</h5>
+    </div>
+    
+    <div class="row center">
+      <br><br>
+      <form action="#" method="post" name="formInput">
+        <div class="row center">
+          <div class="input-field col s6 offset-s3">
+            <label for="sample_ids">Sample IDs:  </label>
+            <input placeholder="SAMEA104266446" name="sample_ids" type="text" class="validate">
+          </div>
+        </div>
+        <button id="submit" type="submit" name="action">Export to Galaxy</button>
+      </form>
+    </div>
+
+</div>
+{% endblock %}
