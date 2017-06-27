@@ -114,7 +114,7 @@ def get_request_params():
 @app.route("/get_data_for_galaxy/")
 def get_data():
     # Assume that a list of BioSample Accessions is needed
-    resource_id = "E-MTAB-3758"
+    resource_id = "E-MTAB-3173"
     BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
     all_sample_accessions = _get_samples(BIOSAMPLES_URL)
 
@@ -126,7 +126,12 @@ def get_data():
 
         if sample_count < 5:
             print acc
+            # create new sample
             sample = AE_sample(acc)
+            # get external links from BioSamples and parse out the ENA sample name
+            # assumptions:
+            # * url contains ERS
+            # * the first ERS link is taken
             biosample_externalLinks = "http://www.ebi.ac.uk/biosamples/api/samplesrelations/{acc}/externalLinks".format(acc=acc)
             biosample_externalLinks_content = requests.get(biosample_externalLinks).content
 
@@ -136,13 +141,19 @@ def get_data():
                 if 'ERS' in link['url']:
                     ena_link = link['url']
                     break
-
+            # if no ENA link is found, skip
             if not ena_link:
                 print("No ENA link found")
                 continue
 
             files = []
 
+            # get ENA sample and parse out run
+            # assumptions
+            # * name of run contains ERR
+            # * first one is taken
+            # also parse out some metadata,
+            # skipping those that start with ENA-, as these are submission date etc.
             ena_sample_file = "{ena_link}&display=xml".format(ena_link=ena_link)
             ena_sample_content = requests.get(ena_sample_file).content
             print "ENA Sample Content: ", ena_sample_content
@@ -154,6 +165,7 @@ def get_data():
                         if 'ERR' in s.text:
                             #print(s.text)
                             ena_run = s.text
+                            break
                 elif child.tag == 'SAMPLE_ATTRIBUTE':
                     for s in child.iter():
                         if s.tag == 'SAMPLE_ATTRIBUTE':
@@ -165,9 +177,13 @@ def get_data():
                             if not 'ENA-' in new_tag:
                                 sample.add_metadata(new_tag, new_value)
                                 #print("%s : %s" % (new_tag, new_value))
-
-                        else:
-                            print("UNEXPECTED TAG : %s" % s.tag)
+                        # debugging
+                        #else:
+                        #    print("UNEXPECTED TAG : %s" % s.tag)
+            # get the info on the ENA RUN and parse the fastq files
+            # assumptions:
+            # * url contains 'ftp.sra.ebi.ac.uk/vol1/fastq/'
+            # * forward and reverse based on _1 and _2
             if ena_run:
                 ena_run_file = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession={ena_run}&result=read_run&fields=fastq_ftp".format(ena_run=ena_run)
                 ena_run_content = requests.get(ena_run_file).content
@@ -184,6 +200,8 @@ def get_data():
                     sample.add_forward_ftp(fastq_uri)
                 elif '_2.fastq' in fastq_uri:
                     sample.add_reverse_ftp(fastq_uri)
+                # get extension from files
+                # expect same extension for all files...
                 if not sample.extension:
                     sample.set_extension(fastq_uri.split('/')[-1].split('.',1)[1])
                 else :
