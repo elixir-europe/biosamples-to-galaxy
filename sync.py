@@ -152,6 +152,7 @@ def _get_data_from_AE(ae_link, sample):
     print(srdf_file)
     AE_content = requests.get(srdf_file).content
     AE_table = pd.read_table(io.StringIO(AE_content.decode('utf-8')))
+    AE_table = AE_table.loc[AE_table['Source Name'] == sample.name]
 
     numberOfDerivedFiles = 0
     checkNextColumn = True
@@ -233,7 +234,22 @@ def get_data():
         if sample_count < 5:
             print acc
             # create new sample
-            sample = AE_sample(acc)
+            biosample_details = "http://www.ebi.ac.uk/biosamples/api/samples/{acc}".format(acc=biosample)
+            biosample_details_content = requests.get(biosample_details).content
+            biosample_details_json = json.loads(biosample_details_content.decode('utf-8'))
+
+            for n in biosample_details_json:
+                print("--- %s" % n)
+
+            name = biosample
+            # if array express data is present I assume the name in BioSamples json
+            # can be used to filter relevant data from AE srdf
+            # name is not always present in the json
+            if 'name' in biosample_details_json:
+                name = biosample_details_json['name'].replace('source ', '')
+                print(name)
+            sample = AE_sample(name)
+
             # get external links from BioSamples and parse out the ENA sample name
             # assumptions:
             # * url contains ERS for ENA
