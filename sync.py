@@ -94,13 +94,22 @@ def hello():
     # export_url is where the "fun" will happen.
     # return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
     
+    # Test: Get list of Biosamples to display on demo page
+    resource_id = "E-MTAB-3173"
+    BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
+    all_sample_accessions = _get_samples(BIOSAMPLES_URL)
+    print len(all_sample_accessions)
+
+
     # use template 
     if request.method == 'GET':
-        return render_template('index.html')
+        return render_template('index.html', all_sample_accessions=all_sample_accessions)
     else:
         app.logger.info("** DATA POSTED")
         # app.logger.info(gx_url)
-        return export()
+        sample_values = request.form.getlist('check')
+        print "CB: ", sample_values
+        return export(sample_values)
 
 
 def get_request_params():
@@ -212,7 +221,7 @@ def get_data():
             biosamples_response.extend(sample.galaxy_json_items())
 
     # test file
-    biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+    # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
     print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
@@ -272,7 +281,7 @@ def _get_samples(url):
 
 
 @app.route("/export/")
-def export():
+def export(sample_values):
     print "** Export called"
     """Return user to Galaxy and provide URL to fetch data from.
 
@@ -282,6 +291,8 @@ def export():
     attribute of the form that generates data to be pointed to the value sent in
     the GALAXY_URL parameter.
     """
+    print "SV: ", sample_values
+
     print "I'm here now - 0"
     print request.args
 
