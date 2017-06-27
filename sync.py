@@ -241,7 +241,7 @@ def get_data():
             for n in biosample_details_json:
                 print("--- %s" % n)
 
-            name = biosample
+            name = acc
             # if array express data is present I assume the name in BioSamples json
             # can be used to filter relevant data from AE srdf
             # name is not always present in the json
