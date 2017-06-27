@@ -253,8 +253,6 @@ def get_data():
             # if no link is found, skip
             if ena_link:
                 sample = _get_fastq_from_ENA_RUN(ena_link, sample)
-                print(sample)
-                AE_samples[sample.name] = sample
             else :
                 print("No ENA link found")
 
@@ -264,6 +262,7 @@ def get_data():
             else :
                 print("No ArrayExpress link found")
 
+            print(sample)
             biosamples_response.extend(sample.galaxy_json_items())
 
     # test file
