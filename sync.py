@@ -92,14 +92,15 @@ def hello():
     # print "** EXPORT_URL", export_url
 
     # export_url is where the "fun" will happen.
-    return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
+    # return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
     
     # use template 
-    # if request.method == 'GET':
-    #     return render_template('index.html')
-    # else:
-    #     app.logger.info("Data posted")
-    #     return render_template('index.html'), get_data()
+    if request.method == 'GET':
+        return render_template('index.html')
+    else:
+        app.logger.info("** DATA POSTED")
+        # app.logger.info(gx_url)
+        return export()
 
 
 def get_request_params():
@@ -132,7 +133,7 @@ def get_data():
 
             ena_sample_file = "http://www.ebi.ac.uk/ena/data/view/{acc}&display=xml".format(acc=acc)
             ena_sample_content = requests.get(ena_sample_file).content
-            print "ENA Sample Content: ", ena_sample_content
+            # print "ENA Sample Content: ", ena_sample_content
             ena_sample_root_element = ET.fromstring(ena_sample_content)
             ena_run = None
             for child in ena_sample_root_element.iter():
@@ -180,7 +181,7 @@ def get_data():
             biosamples_response.extend(sample.galaxy_json_items())
 
     # test file
-    # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+    biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
     print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
@@ -212,30 +213,30 @@ def _get_samples(url):
         r.raise_for_status()
 
 
-@app.route("/fetch/")
-def fetch():
-    print "** Fetch called" #Not using this right now
-    """Route for Galaxy to fetch data at
+# @app.route("/fetch/")
+# def fetch():
+#     print "** Fetch called" #Not using this right now
+#     """Route for Galaxy to fetch data at
 
-    4. When Galaxy receives the parameters it will run a URL fetching process
-    in the background that will resubmit the parameters to the datasource, and it
-    will deposit the returned data in the user's account.
-    """
+#     4. When Galaxy receives the parameters it will run a URL fetching process
+#     in the background that will resubmit the parameters to the datasource, and it
+#     will deposit the returned data in the user's account.
+#     """
 
-    # response = ['#Key\tValue']
-    # for key in request.args:
-    #     response.append('%s\t%s' % (key, request.args[key]))
-    # return '\n'.join(response)
+#     # response = ['#Key\tValue']
+#     # for key in request.args:
+#     #     response.append('%s\t%s' % (key, request.args[key]))
+#     # return '\n'.join(response)
 
-    biosamples_response = [{'url': 'ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR143/001/ERR1433121/ERR1433121.fastq.gz', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+#     biosamples_response = [{'url': 'ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR143/001/ERR1433121/ERR1433121.fastq.gz', 'name': 'AE BioSamples Test', "extension":"tabular"}]
 
-    # {'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
-    print type(biosamples_response)
+#     # {'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
+#     print type(biosamples_response)
 
-    json_biosamples_response = json.dumps(biosamples_response)
-    # return json_biosamples_response
-    url_for_galaxy = "http://localhost:4000/get_data_for_galaxy"
-    return url_for_galaxy
+#     json_biosamples_response = json.dumps(biosamples_response)
+#     # return json_biosamples_response
+#     url_for_galaxy = "http://localhost:4000/get_data_for_galaxy"
+#     return url_for_galaxy
 
 
 
@@ -250,9 +251,16 @@ def export():
     attribute of the form that generates data to be pointed to the value sent in
     the GALAXY_URL parameter.
     """
+    print "I'm here now - 0"
+    print request.args
 
     # Extract the Galaxy URL to redirect the user to from the parameters (or any other suitable source like session data)
-    return_to_galaxy = request.args['gx_url']
+    try:
+        return_to_galaxy = request.args['GALAXY_URL']
+    except Exception as e:
+        print e 
+
+    print "I'm here now - 1"
     # Construct the URL to fetch data from. That page should respond with the
     # entire content that you wish to go into a dataset (no
     # partials/paginated/javascript/etc)
@@ -283,6 +291,7 @@ def export():
     url_parts[4] = urllib.urlencode(query)
     redir = urlparse.urlunparse(url_parts)
 
+    print "I'm here now - 2"
 
     # Then redirect the user to Galaxy
     return redirect(redir, code=302)
