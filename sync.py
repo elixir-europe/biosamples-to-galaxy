@@ -238,9 +238,6 @@ def get_data():
             biosample_details_content = requests.get(biosample_details).content
             biosample_details_json = json.loads(biosample_details_content.decode('utf-8'))
 
-            for n in biosample_details_json:
-                print("--- %s" % n)
-
             name = acc
             # if array express data is present I assume the name in BioSamples json
             # can be used to filter relevant data from AE srdf
