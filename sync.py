@@ -51,10 +51,10 @@ class AE_sample :
 
         return "{name} ({mode})\n\t{file}\n".format(name = self.name, mode = mode, file = '\n\t'.join(files))
 
-    def ena_json_item (self, uri):
+    def ena_json_item (self, uri, mode):
         item = {}
         item['url'] = uri
-        item['name'] = self.name
+        item['name'] = "{sample} {mode}".format(sample=self.name, mode=mode)
         item['extension'] = self.extension
         item['metadata'] = self.metadata
 
@@ -68,9 +68,10 @@ class AE_sample :
 
     def ae_json_item (self, uri):
         item = {}
+        extension = uri.split('/')[-1].split('.')[-1]
         item['url'] = uri
-        item['name'] = self.name
-        item['extension'] = uri.split('/')[-1].split('.')[-1]
+        item['name'] = "{sample} ({filetype})".format(sample=self.name, filetype=extension)
+        item['extension'] = extension
         item['metadata'] = self.metadata
 
         item['extra_data'] = [
@@ -84,10 +85,10 @@ class AE_sample :
     def galaxy_json_items (self):
         items = []
         if self.forward_ftp:
-            items.append(self.ena_json_item(self.forward_ftp))
+            items.append(self.ena_json_item(self.forward_ftp, 'forward'))
             print "ENA ", self.forward_ftp
         if self.reverse_ftp:
-            items.append(self.ena_json_item(self.reverse_ftp))
+            items.append(self.ena_json_item(self.reverse_ftp, 'reverse'))
             print "ENA ", self.reverse_ftp
         for ae in self.AE_ftp:
             items.append(self.ae_json_item(ae))
@@ -149,7 +150,7 @@ def _get_data_from_AE(ae_link, sample):
     ae_id = ae_link.split('/')[-1]
 
     srdf_file = "http://www.ebi.ac.uk/arrayexpress/files/{acc}/{acc}.sdrf.txt".format(acc = ae_id)
-    print(srdf_file)
+    #print(srdf_file)
     AE_content = requests.get(srdf_file).content
     AE_table = pd.read_table(io.StringIO(AE_content.decode('utf-8')))
     AE_table = AE_table.loc[AE_table['Source Name'] == sample.name]
@@ -164,11 +165,11 @@ def _get_data_from_AE(ae_link, sample):
 
         columnName = "Comment [Derived ArrayExpress FTP file]%s" % postfix
         if columnName in AE_table:
-            print("OK %s" % columnName)
+            #print("OK %s" % columnName)
             numberOfDerivedFiles += 1
             files.extend(AE_table.drop_duplicates(columnName)[columnName].values.tolist())
         else:
-            print("NOT %s" % columnName)
+            #print("NOT %s" % columnName)
             checkNextColumn = False
 
     for f in files:
