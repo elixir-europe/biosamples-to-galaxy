@@ -123,10 +123,21 @@ def get_request_params():
 
 @app.route("/get_data_for_galaxy/")
 def get_data():
+    response = []
+    for key in request.args:
+        print "RK: ", request.args[key].split(',')
+        # response.append('%s\t%s' % (key, request.args[key]))
+        # response.append('%s' % request.args[key])
+        response = request.args[key].split(',')
+    print "Formatted Response: ", response
+    #'\n'.join(response)
+
     # Assume that a list of BioSample Accessions is needed
     resource_id = "E-MTAB-3173"
     BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
-    all_sample_accessions = _get_samples(BIOSAMPLES_URL)
+    # all_sample_accessions = _get_samples(BIOSAMPLES_URL)
+    # print "ASA: ", all_sample_accessions
+    all_sample_accessions = response
 
     biosamples_response = []
 
@@ -134,7 +145,7 @@ def get_data():
     for acc in all_sample_accessions:
         sample_count += 1
 
-        if sample_count < 5:
+        if sample_count < 30:
             print acc
             # create new sample
             sample = AE_sample(acc)
@@ -223,7 +234,7 @@ def get_data():
     # test file
     # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
-    print json_biosamples_response
+    # print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
     return json_biosamples_response
 
@@ -292,8 +303,8 @@ def export(sample_values):
     the GALAXY_URL parameter.
     """
     print "SV: ", sample_values
+    sample_values_url_param = ','.join(sample_values)
 
-    print "I'm here now - 0"
     print request.args
 
     # Extract the Galaxy URL to redirect the user to from the parameters (or any other suitable source like session data)
@@ -302,7 +313,6 @@ def export(sample_values):
     except Exception as e:
         print e 
 
-    print "I'm here now - 1"
     # Construct the URL to fetch data from. That page should respond with the
     # entire content that you wish to go into a dataset (no
     # partials/paginated/javascript/etc)
@@ -315,16 +325,22 @@ def export(sample_values):
     # TODO: Galaxy Hackathon - Change to call function in this file to do the work to get the files to exprt to Galxay
     # fetch_url = 'http://localhost:4000/fetch/'
 
+    bsd_url = 'http://localhost:4000/get_data_for_galaxy/?sample_list='+sample_values_url_param
+    print "BSD_PARAMS_URL: ", bsd_url
+
 
     # Must provide some parameters to Galaxy
     params = {
-            'URL': 'http://localhost:4000/get_data_for_galaxy/',
+            # 'URL': 'http://localhost:4000/get_data_for_galaxy/',
+            # 'URL': 'http://localhost:4000/get_data_for_galaxy/?sample_list='+sample_values_url_param,
+            'URL': bsd_url,
             # You can set the dataset type, should be a Galaxy datatype name
             'type': 'tabular',
             # And the output filename
             'name': 'SyncDataset Name - BioSamples',
             }
 
+    print "** PARAMS: ", params
 
     # Found on the web, update an existing URL with possible additional parameters
     url_parts = list(urlparse.urlparse(return_to_galaxy))
@@ -332,8 +348,10 @@ def export(sample_values):
     query.update(params)
     url_parts[4] = urllib.urlencode(query)
     redir = urlparse.urlunparse(url_parts)
+    #TODO: Check content of redir
+    print "** REDIRECT URL: ", redir
+ 
 
-    print "I'm here now - 2"
 
     # Then redirect the user to Galaxy
     return redirect(redir, code=302)
@@ -341,3 +359,5 @@ def export(sample_values):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=4000, debug=True)
+
+
