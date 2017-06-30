@@ -1,5 +1,48 @@
 {% extends "main.html" %}
 {% block content %}
+
+<!-- Get list of Sample Ids --> 
+<script type="text/javascript">
+  $(function() {
+    var submit_form = function(e) {
+      $.getJSON($SCRIPT_ROOT + '/search_input', {
+        sample_ids: $('input[name="sample_ids"]').val(),
+      }, function(data) {
+        $('#all_sample_accessions').text(data.items);
+        // console.log(data.items)
+
+        for (var i = 0; i < data.items.length; i++) {
+            // console.log(data.items[i])
+            var checkbox = document.createElement('input');
+            checkbox.type = "checkbox";
+            checkbox.id = "id" + i;
+            checkbox.name = "check";
+            checkbox.value = data.items[i];
+            document.getElementById( 'append' ).appendChild(checkbox);
+            
+            var label = document.createElement("label");
+            label.setAttribute("for", data.items[i]);
+            label.innerHTML = data.items[i];
+            document.getElementById( 'append' ).appendChild(label)
+            
+            var br = document.createElement("br");
+            document.getElementById( 'append' ).appendChild(br)
+        }
+        $("#submit-btn").removeAttr("disabled");
+        $("#submit-btn").removeClass("disabled")
+      });
+      return false;
+    };
+    $('a#listsamples').bind('click', submit_form);
+    $('input[type=text]').bind('keydown', function(e) {
+      if (e.keyCode == 13) {
+        submit_form(e);
+      }
+    });
+    $('input[name=sample_ids]').focus();
+  });
+</script>
+
  <div class="container">
     <br><br>
     <h1>BioSamples</h1>
@@ -7,8 +50,27 @@
     <div class="row center">
       <h5>Select data to export to Galaxy</h5>
     </div>
-    
+
+    <!-- Dynamic Sample ID selection -->
     <div class="row center">
+      <br>
+        <div class="input-field">
+          <label for="sample_ids">Sample IDs:  </label>
+          <input placeholder="E-MTAB-3173" name="sample_ids" type="text" class="validate">
+        </div>
+        <a href=# id=listsamples>Get Sample IDs</a>
+
+        <form action="{{ url_for('hello') }}" method="post" name="formInput">
+          <div id="append" name="append">
+            Append here <br>
+            <input type="hidden" name="export_url" value="{{ export_url }}"/>
+          </div>
+          <br>
+          <button id="submit-btn" type="submit" name="action" class="btn disabled" disabled>Export to Galaxy</button>
+        </form>
+    
+    <!-- ORIGINAL -->
+    <!-- <div class="row center">
       <br><br>
       <form action="#" method="post" name="formInput">
         <div class="row center">
@@ -19,7 +81,10 @@
         </div>
         <button id="submit" type="submit" name="action">Export to Galaxy</button>
       </form>
-    </div>
+    </div> -->
 
+
+  </div>
+  <br><br><br>
 </div>
 {% endblock %}
