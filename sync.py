@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, render_template
+from flask import Flask, request, redirect, render_template, session, jsonify
 app = Flask(__name__)
 import urllib
 import urlparse
@@ -177,8 +177,22 @@ def _get_data_from_AE(ae_link, sample):
 
     return sample
 
+
+@app.route("/search_input")
+def search_input():
+    bs_search = request.args.get('sample_ids', type=str)
+    BIOSAMPLES_SEARCH = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text="+bs_search
+    print "** BSS: ", BIOSAMPLES_SEARCH
+    all_sample_accessions = _get_samples(BIOSAMPLES_SEARCH)
+    print "** SAMPLE-IDS: ", all_sample_accessions
+    return jsonify(items = all_sample_accessions)
+
+
 @app.route("/", methods=['GET', 'POST'])
 def hello():
+    print "hello() called..."
+    print "Method call: ", request.method
+    
     """Index page
 
     1. Upon choosing the datasource Galaxy performs a HTTP POST request to the
@@ -193,20 +207,45 @@ def hello():
     """
 
     # Normally we would store this in their session data
-    gx_url = urllib.urlencode({'gx_url': request.args['GALAXY_URL']})
+    # gx_url = urllib.urlencode({'gx_url': request.args['GALAXY_URL']})
+    # print "** gx_url: ", request.args['GALAXY_URL']
+    # # for use with Flask Session
+    # gx_url = request.args['GALAXY_URL']
+    # session['gx_url'] = gx_url
+
     # However we aren't developing a big application, so we simply pass it in the URL
-    export_url = '/export/?' + gx_url
+    # export_url = '/export/?' + gx_url
     # print "** EXPORT_URL", export_url
+
+    # Test: Get list of Biosamples to display on demo page
+    # resource_id = "E-MTAB-3173"
+    # BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
+    # all_sample_accessions = _get_samples(BIOSAMPLES_URL)
+    # print all_sample_accessions
+
+    # Store list of samples as a Session variable
+    # session['all_samples'] = all_sample_accessions
+    # print "** Session - all samples accs: ", session['all_samples']
+
 
     # export_url is where the "fun" will happen.
     # return HEAD + "<h1>Galaxy Sync Data Source Test</h1>" + '<a href="' + export_url + '">Export Data</a>' + get_request_params() + TAIL
 
     # use template
     if request.method == 'GET':
+        print "** gx_url: ", request.args['GALAXY_URL']
+        # for use with Flask Session
+        gx_url = request.args['GALAXY_URL']
+        session['gx_url'] = gx_url
         return render_template('index.html')
     else:
         app.logger.info("** DATA POSTED")
         # app.logger.info(gx_url)
+        sample_values = request.form.getlist('check')
+        print "CB: ", sample_values
+        # Store list of samples as a Session variable
+        session['all_samples'] = sample_values
+        print "** Session - all samples accs: ", session['all_samples']
         return export()
 
 
@@ -228,14 +267,13 @@ def get_data():
         # response.append('%s' % request.args[key])
         response = request.args[key].split(',')
     print "Formatted Response: ", response
-    #'\n'.join(response)
+
+    all_sample_accessions = response
 
     # Assume that a list of BioSample Accessions is needed
-    resource_id = "E-MTAB-3173"
-    BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
+    # resource_id = "E-MTAB-3173"
+    # BIOSAMPLES_URL = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=%22"+resource_id+"%22"
     # all_sample_accessions = _get_samples(BIOSAMPLES_URL)
-    # print "ASA: ", all_sample_accessions
-    all_sample_accessions = response
 
     biosamples_response = []
 
@@ -243,8 +281,8 @@ def get_data():
     for acc in all_sample_accessions:
         sample_count += 1
 
-        if sample_count < 30:
-            print acc
+        if sample_count < 2:
+            print "** Sample Accession for Data Export: ", acc
             # create new sample
             biosample_details = "http://www.ebi.ac.uk/biosamples/api/samples/{acc}".format(acc=acc)
             biosample_details_content = requests.get(biosample_details).content
@@ -294,7 +332,7 @@ def get_data():
     # test file
     # biosamples_response = [{'url': 'http://www.ebi.ac.uk/arrayexpress/files/E-MTAB-4758/E-MTAB-4758.idf.txt', 'name': 'AE BioSamples Test', "extension":"tabular"}]
     json_biosamples_response = json.dumps(biosamples_response)
-    # print json_biosamples_response
+    print json_biosamples_response
     #NOTE: Use Python Libraries to parameterize URL
     return json_biosamples_response
 
@@ -362,18 +400,23 @@ def export():
     attribute of the form that generates data to be pointed to the value sent in
     the GALAXY_URL parameter.
     """
+    print "I'm here now - 0"
+    print request.method
 
-    print "SV: ", sample_values
+    sample_values = session['all_samples']
+    print "** ALL Samples - EXPORT(): ", sample_values
     sample_values_url_param = ','.join(sample_values)
-
-    print request.args
 
     # Extract the Galaxy URL to redirect the user to from the parameters (or any other suitable source like session data)
     try:
-        return_to_galaxy = request.args['GALAXY_URL']
+        # return_to_galaxy = request.args['GALAXY_URL']
+        # update to get Galaxy URL from Flask Session
+        return_to_galaxy = urllib.unquote(session['gx_url'])
+        print "** GX_URL: ", return_to_galaxy
     except Exception as e:
         print e
 
+    print "I'm here now - 1"
     # Construct the URL to fetch data from. That page should respond with the
     # entire content that you wish to go into a dataset (no
     # partials/paginated/javascript/etc)
@@ -387,13 +430,12 @@ def export():
     # fetch_url = 'http://localhost:4000/fetch/'
 
     bsd_url = 'http://localhost:4000/get_data_for_galaxy/?sample_list='+sample_values_url_param
-    print "BSD_PARAMS_URL: ", bsd_url
+    print "BSD_PARAMS_URL: ", bsd_url, type(str(bsd_url))
 
 
     # Must provide some parameters to Galaxy
     params = {
             # 'URL': 'http://localhost:4000/get_data_for_galaxy/',
-            # 'URL': 'http://localhost:4000/get_data_for_galaxy/?sample_list='+sample_values_url_param,
             'URL': bsd_url,
             # You can set the dataset type, should be a Galaxy datatype name
             'type': 'tabular',
@@ -401,7 +443,6 @@ def export():
             'name': 'SyncDataset Name - BioSamples',
             }
 
-    print "** PARAMS: ", params
 
     # Found on the web, update an existing URL with possible additional parameters
     url_parts = list(urlparse.urlparse(return_to_galaxy))
@@ -409,16 +450,16 @@ def export():
     query.update(params)
     url_parts[4] = urllib.urlencode(query)
     redir = urlparse.urlunparse(url_parts)
-    #TODO: Check content of redir
     print "** REDIRECT URL: ", redir
- 
 
+    print "I'm here now - 2"
 
     # Then redirect the user to Galaxy
     return redirect(redir, code=302)
     # Galaxy will subsequently make a request to `fetch_url`
 
 if __name__ == "__main__":
+    app.secret_key = 'my_secret_key'
     app.run(host='0.0.0.0', port=4000, debug=True)
 
 
