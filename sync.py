@@ -180,12 +180,14 @@ def _get_data_from_AE(ae_link, sample):
 
 @app.route("/search_input")
 def search_input():
+    """ 
+    Take in a search term and return a list of Sample IDs and other metadata. 
+    """
     bs_search = request.args.get('sample_ids', type=str)
     BIOSAMPLES_SEARCH = "http://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text="+bs_search
-    print "** BSS: ", BIOSAMPLES_SEARCH
+    # print "** BSS: ", BIOSAMPLES_SEARCH
     all_sample_accessions = _get_samples(BIOSAMPLES_SEARCH)
-    print "** SAMPLE-IDS: ", all_sample_accessions
-    return jsonify(items = all_sample_accessions)
+    return jsonify(all_sample_accessions)
 
 
 @app.route("/", methods=['GET', 'POST'])
@@ -338,28 +340,43 @@ def get_data():
 
 
 def _get_samples(url):
+    """ 
+    Use search term and BioSamples 'findByText' API (https://www.ebi.ac.uk/biosamples/help/api).
+    """
     all_sample_accessions = []
+    all_sample_data = {}
 
     r = requests.get(url, headers={"Accept": "application/json"})
     if r.status_code == 200:
         response = r.text
         data = json.loads(response)
 
-        if 'next' not in data['_links']:
+        if 'next' in data['_links']:
             sample_list = data['_embedded']['samples']
             for sample in sample_list:
                 accession = sample['accession']
-                all_sample_accessions.append(accession)
-            return all_sample_accessions
-            # print len(all_sample_accessions)
+                name = sample['name']
+                description = sample['description']
+                all_sample_data['accession'] = accession
+                all_sample_accessions.append(all_sample_data.copy())
+            return all_sample_accessions + _get_samples(data['_links']['next']['href'])
         else:
             sample_list = data['_embedded']['samples']
             for sample in sample_list:
                 accession = sample['accession']
-                all_sample_accessions.append(accession)
-            return all_sample_accessions + _get_samples(data['_links']['next']['href'])
+                name = sample['name']
+                description = sample['description']
+                all_sample_data['accession'] = accession
+                all_sample_data['name'] = name
+                if description:
+                    all_sample_data['description'] = description
+                else:
+                    all_sample_data['description'] = 'None'
+                all_sample_accessions.append(all_sample_data.copy())
+            return all_sample_accessions
     else:
         r.raise_for_status()
+
 
 
 # @app.route("/fetch/")
