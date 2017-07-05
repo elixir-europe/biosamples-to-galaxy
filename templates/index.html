@@ -1,90 +1,102 @@
 {% extends "main.html" %}
 {% block content %}
 
-<!-- Get list of Sample Ids --> 
-<script type="text/javascript">
-  $(function() {
-    var submit_form = function(e) {
-      $.getJSON($SCRIPT_ROOT + '/search_input', {
-        sample_ids: $('input[name="sample_ids"]').val(),
-      }, function(data) {
-        $('#all_sample_accessions').text(data.items);
-        // console.log(data.items)
+<div class="container">
+  <div class="row">
+      <div class="col-md-6">
+          <h4>BioSamples to Galaxy Demo</h4>
+      </div>
+  </div>
+  <hr>
+  <div class="row">
+      <div class="col-md-6 input-field">
+          <form class="form-inline" data-bind="submit: searchSamples">
+              <div class="form-group">
+                  <label for="sample_ids"> Sample IDs: </label>
+                  <input data-bind="value: newSampleText" placeholder='"E-MTAB-3173"' class="form-control" aria-describedby="helpBlock" name="sample_ids" type="text" class="validate"/>
+                  <button type="submit" class="btn btn-primary btn-sm">Submit</button>
+                  <span id="helpBlock" class="help-block">Enter a search term or "accession".</span>
+              </div>
+          </form>
+      </div>
+  </div>
 
-        for (var i = 0; i < data.items.length; i++) {
-            // console.log(data.items[i])
-            var checkbox = document.createElement('input');
-            checkbox.type = "checkbox";
-            checkbox.id = "id" + i;
-            checkbox.name = "check";
-            checkbox.value = data.items[i];
-            document.getElementById( 'append' ).appendChild(checkbox);
-            
-            var label = document.createElement("label");
-            label.setAttribute("for", data.items[i]);
-            label.innerHTML = data.items[i];
-            document.getElementById( 'append' ).appendChild(label)
-            
-            var br = document.createElement("br");
-            document.getElementById( 'append' ).appendChild(br)
-        }
-        $("#submit-btn").removeAttr("disabled");
-        $("#submit-btn").removeClass("disabled")
-      });
-      return false;
-    };
-    $('a#listsamples').bind('click', submit_form);
-    $('input[type=text]').bind('keydown', function(e) {
-      if (e.keyCode == 13) {
-        submit_form(e);
-      }
-    });
-    $('input[name=sample_ids]').focus();
-  });
-</script>
-
- <div class="container">
-    <br><br>
-    <h1>BioSamples</h1>
-    
-    <div class="row center">
-      <h5>Select data to export to Galaxy</h5>
+  <form action="{{ url_for('hello') }}" method="post">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="panel-group" data-bind="foreach: samples, visible: samples().length > 0">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <div class="panel-title">
+                            <input type="checkbox" name="check" data-bind="checked: isDone, value: accession"/>
+                            <label><span class="h4" data-bind="text: accession">&nbsp;</span></label>
+                            <label>&nbsp;| &nbsp;</label>
+                            <label><span class="h4" data-bind="text: name">&nbsp;</span></label>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <label class="font-weight-normal"> Description: <span data-bind="text: description">&nbsp;</span></label>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Dynamic Sample ID selection -->
-    <div class="row center">
-      <br>
-        <div class="input-field">
-          <label for="sample_ids">Sample IDs:  </label>
-          <input placeholder="E-MTAB-3173" name="sample_ids" type="text" class="validate">
+    <div class="row">
+        <div class="col-md-6">
+            <label>  
+                <span data-bind="visible: checkedSamples().length >= 1"> 
+                    Number of selected samples: 
+                    <b data-bind="text: checkedSamples().length">&nbsp;</b>
+                </span>
+            </label>
         </div>
-        <a href=# id=listsamples>Get Sample IDs</a>
-
-        <form action="{{ url_for('hello') }}" method="post" name="formInput">
-          <div id="append" name="append">
-            Append here <br>
-            <input type="hidden" name="export_url" value="{{ export_url }}"/>
-          </div>
-          <br>
-          <button id="submit-btn" type="submit" name="action" class="btn disabled" disabled>Export to Galaxy</button>
-        </form>
+    </div>
     
-    <!-- ORIGINAL -->
-    <!-- <div class="row center">
-      <br><br>
-      <form action="#" method="post" name="formInput">
-        <div class="row center">
-          <div class="input-field col s6 offset-s3">
-            <label for="sample_ids">Sample IDs:  </label>
-            <input placeholder="SAMEA104266446" name="sample_ids" type="text" class="validate">
-          </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div>
+                <button type="submit" class="btn btn-primary btn-sm" data-bind="visible: checkedSamples().length >= 1"> Submit to Galaxy</button>
+            </div>
         </div>
-        <button id="submit" type="submit" name="action">Export to Galaxy</button>
-      </form>
-    </div> -->
+    </div>
+  </form>
+  
+<br><br>
+</div>
 
+<!-- Knockout Script -->
+<script type="text/javascript">
+function Sample(data) {
+    this.isDone = ko.observable(data.isDone);
+    this.accession = ko.observable(data.accession)
+    this.name = ko.observable(data.name)
+    this.description = ko.observable(data.description)
+}
 
-  </div>
-  <br><br><br>
+function SampleListViewModel() {
+    var self = this;
+    self.samples = ko.observableArray([]);
+    self.newSampleText = ko.observable();
+    self.checkedSamples = ko.computed(function() {
+        return ko.utils.arrayFilter(self.samples(), function(sample) { return sample.isDone() });
+    });
+
+    self.searchSamples = function () {
+        console.log("Search samples...")
+        $.getJSON('/search_input', {
+            sample_ids: $('input[name="sample_ids"]').val(),
+      }, function(allData) {
+            console.log(allData)
+            var mappedSamples = $.map(allData, function(item) { return new Sample(item) });
+            self.samples(mappedSamples);
+        })
+    };
+}
+
+ko.applyBindings(new SampleListViewModel());
+</script>
+
+<br><br><br>
 </div>
 {% endblock %}
