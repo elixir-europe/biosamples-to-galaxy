@@ -12,3 +12,9 @@ Running the example:
 2. `pip install flask`
 3. `python sync.py`
 4. Use the tool in Galaxy
+
+# Use Case for BioSamples
+Given a publication with an Array Express ID: 
+- how can I find other samples that are part of this experiment (e.g. BioSamples Groups)
+- how can I get any other data that BioSamples knows for this sample and those in the group
+
